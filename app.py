@@ -11,7 +11,8 @@ st.subheader("Interactive Stress-Testing: Tracking, Optimization, & Financial Co
 # ====================================================
 # EXCHANGE RATE LAYER (Static baseline for dual-currency)
 # ====================================================
-USD_TO_INR = 83.50  # 1 USD = ₹83.50 INR
+# 1 USD = ₹83.50 INR
+USD_TO_INR = 83.50  
 
 # ====================================================
 # 🎛️ INTERACTIVE SIDEBAR SLIDERS & CONTROLS
@@ -68,11 +69,12 @@ historical_power = np.random.normal(loc=500, scale=50, size=720)
 historical_emissions = 50 + (historical_power * 0.6) + (historical_throughput * 2.0) + np.random.normal(loc=0, scale=5, size=720)
 
 training_df = pd.DataFrame({
-    "power_draw_kw": historical_power,
     "throughput_tons": historical_throughput,
+    "power_draw_kw": historical_power,
     "direct_emissions_kg": historical_emissions
 }, index=extended_time_index)
 
+# Note the exact feature array layout order: ['throughput_tons', 'power_draw_kw']
 optimizer_model = LinearRegression()
 optimizer_model.fit(training_df[['throughput_tons', 'power_draw_kw']], training_df['direct_emissions_kg'])
 
@@ -86,7 +88,7 @@ with col_btn1:
 with col_btn2:
     trigger_leak = st.toggle("🚨 Force Simulated Hardware Failure / Leak Event", value=False)
 
-# Simulate current streaming values
+# Simulate current streaming metrics
 current_throughput = float(np.random.normal(loc=53, scale=2))
 current_power = float(np.random.normal(loc=515, scale=25))
 
@@ -95,15 +97,15 @@ if trigger_leak:
 else:
     current_emissions = float(50 + (current_power * 0.6) + (current_throughput * 2.0) + np.random.normal(loc=0, scale=2))
 
-# Run the AI Optimization Math using the Sliders' Inputs
+# CORRECTION: Define columns in the exact structural order used during .fit()
 input_features = pd.DataFrame([[current_throughput, current_power]], columns=['throughput_tons', 'power_draw_kw'])
-normal_predicted = float(optimizer_model.predict(input_features))
+normal_predicted = float(optimizer_model.predict(input_features)[0])
 residual_error = current_emissions - normal_predicted
 
-# Calculate dynamic reduction using the user's slider input
+# Calculate dynamic reduction using the slider targets
 reduction_factor = 1.0 - (LOAD_REDUCTION_PCT / 100.0)
 optimized_features = pd.DataFrame([[current_throughput, current_power * reduction_factor]], columns=['throughput_tons', 'power_draw_kw'])
-optimized_predicted = float(optimizer_model.predict(optimized_features))
+optimized_predicted = float(optimizer_model.predict(optimized_features)[0])
 
 carbon_saved_kg = normal_predicted - optimized_predicted
 
