@@ -3,8 +3,14 @@ import pandas as pd
 import numpy as np
 import requests
 from sklearn.linear_model import LinearRegression
+# --- IMPORT AUTOREFRESH COMPONENT ---
+from streamlit_autorefresh import st_autorefresh
 
 st.set_page_config(page_title="Industrial Decarbonization AI Engine", layout="wide")
+
+# --- CONFIGURE AUTOMATED UI REFRESH (Every 2000ms / 2 Seconds) ---
+st_autorefresh(interval=2000, limit=None, key="scada_telemetry_counter")
+
 st.title("🏭 Industrial Decarbonization AI Platform")
 st.subheader("Interactive Stress-Testing: Tracking, Optimization, & Financial Cost Audit")
 
@@ -82,8 +88,7 @@ optimizer_model.fit(training_df[['throughput_tons', 'power_draw_kw']], training_
 # ----------------------------------------------------
 col_btn1, col_btn2 = st.columns(2)
 with col_btn1:
-    if st.button("🔄 Poll Live SCADA Sensors"):
-        st.rerun()
+    st.caption("🔄 **Autorefresh Active:** Dashboard updates sensors live every 2 seconds.")
 with col_btn2:
     trigger_leak = st.toggle("🚨 Force Simulated Hardware Failure / Leak Event", value=False)
 
