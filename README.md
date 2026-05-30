@@ -107,3 +107,21 @@ To demonstrate the real-time closed-loop decision capabilities of the AI platfor
 
 ## 📊 Data Transparency Notes
 Historical baseline data streams loaded within this application are compiled from the **Our World in Data (OWID)** public global greenhouse gas database repository [🎯], derived from consensus metrics published by the *Global Carbon Project* and *Jones et al. (2024)*. If network barriers isolate your environment, the code activates local data frames to preserve continuous uptime.
+
+## System Architecture & IoT Data Pipeline
+
+The diagram below illustrates how physical factory hardware measures real-world metrics, bundles them into structured data packets, and streams them securely to your real-time Streamlit analytics platform:
+
+
+
+┌──────────────────┐      Analog Volt/Amp Signals      ┌───────────────────────────┐
+│ Factory Machine  ├──────────────────────────────────►│  Physical IoT Hardware   │
+│  (Active Load)   │                                   │ (CT Clamps & Load Cells)  │
+└──────────────────┘                                   └─────────────┬─────────────┘
+                                                                     │
+                                                                     │ Raw Line Readings
+                                                                     ▼
+┌──────────────────┐       Paho MQTT Client Sub        ┌───────────────────────────┐
+│  Streamlit App   │◄──────────────────────────────────┤     ESP32 Microchip /     │
+│ (AI UI Engine)   │     JSON Payload Packet Streams   │  Industrial Edge Gateway  │
+└──────────────────┘     Topic: factory/scada/telemetry└───────────────────────────┘
