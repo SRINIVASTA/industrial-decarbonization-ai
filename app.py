@@ -40,11 +40,13 @@ try:
     st.sidebar.success("✅ Connected to Our World in Data live feed")
 except:
     st.sidebar.warning("⚠️ Using local baseline data (Live URL unreachable)")
-    recent_global = pd.DataFrame({
+    fallback_data = {
         'year': [2021, 2022, 2023, 2024, 2025],
         'cement_co2': [1610.4, 1615.1, 1622.3, 1630.0, 1635.8],
         'industry_co2': [11450.2, 11520.8, 11600.1, 11580.4, 11610.2]
-    })
+    }
+    recent_global = pd.DataFrame(fallback_data)
+st.sidebar.markdown("**Global Industrial Baselines:**")
 st.sidebar.dataframe(recent_global.set_index('year'))
 
 # ----------------------------------------------------
@@ -88,7 +90,7 @@ with col_btn2:
 ist_timezone = pytz.timezone('Asia/Kolkata')
 current_ist_time = datetime.now(ist_timezone).strftime('%Y-%m-%d %H:%M:%S')
 
-# Generate live metrics
+# Generate live metrics with dynamic clock variance to bypass cache freeze
 live_drift = (time.time() % 10) - 5  
 current_throughput = float(np.random.uniform(51.0, 55.0) + (live_drift * 0.1))
 current_power = float(np.random.uniform(490.0, 540.0) + live_drift)
@@ -98,25 +100,22 @@ if trigger_leak:
 else:
     current_emissions = float(50 + (current_power * 0.6) + (current_throughput * 2.0) + np.random.uniform(-3, 3))
 
-# ML Baseline Predictions
+# Core Machine Learning Array Extracted safely using explicit [0] index locators
 input_features = pd.DataFrame([[current_throughput, current_power]], columns=['throughput_tons', 'power_draw_kw'])
-normal_predicted = float(optimizer_model.predict(input_features))
+normal_predicted = float(optimizer_model.predict(input_features)[0])
 residual_error = current_emissions - normal_predicted
 
 reduction_factor = 1.0 - (LOAD_REDUCTION_PCT / 100.0)
 optimized_features = pd.DataFrame([[current_throughput, current_power * reduction_factor]], columns=['throughput_tons', 'power_draw_kw'])
-optimized_predicted = float(optimizer_model.predict(optimized_features))
+optimized_predicted = float(optimizer_model.predict(optimized_features)[0])
 carbon_saved_hourly_kg = normal_predicted - optimized_predicted
 
 # ====================================================
-# 🧮 RECALIBRATED REAL-TIME 2-SECOND MATHEMATICS
+# 🧮 REAL-TIME 2-SECOND MATHEMATICS
 # ====================================================
-# Convert hourly resource metrics to a 2-second interval window (1 hour = 1800 cycles of 2 seconds)
 INTERVAL_DIVISOR = 1800.0
-
 carbon_saved_2s_kg = carbon_saved_hourly_kg / INTERVAL_DIVISOR
 
-# 2s Financial Calculations: (Power Draw drop converted to 2s kWh consumption) + (2s Carbon Tax saved)
 power_saved_kw = current_power * (LOAD_REDUCTION_PCT / 100.0)
 energy_savings_usd_2s = (power_saved_kw / INTERVAL_DIVISOR) * ENERGY_COST_PER_KWH
 carbon_savings_usd_2s = (carbon_saved_2s_kg / 1000.0) * CARBON_TAX_PER_TON
@@ -124,7 +123,7 @@ carbon_savings_usd_2s = (carbon_saved_2s_kg / 1000.0) * CARBON_TAX_PER_TON
 savings_usd_2s = energy_savings_usd_2s + carbon_savings_usd_2s
 savings_inr_2s = savings_usd_2s * USD_TO_INR
 
-# --- APPEND RECENT ROW HORIZONTALLY TO DATABASE ---
+# --- APPEND RECENT ROW HORIZONTALLY TO MEMORY DATABASE ---
 new_audit_row = pd.DataFrame([{
     "Timestamp (IST)": current_ist_time,
     "Live Throughput (T/h)": round(current_throughput, 2),
@@ -134,12 +133,13 @@ new_audit_row = pd.DataFrame([{
     "Emissions Residual Gap (kg)": round(residual_error, 2),
     "Carbon Tax ($/Ton)": CARBON_TAX_PER_TON,
     "Electricity Rate ($/kWh)": ENERGY_COST_PER_KWH,
-    "2s Cycle Savings (USD)": round(savings_usd_2s, 4),  # Rounded to 4 decimals to show fine value shifts
+    "2s Cycle Savings (USD)": round(savings_usd_2s, 4),
     "2s Cycle Savings (INR)": round(savings_inr_2s, 2)
 }])
 
 st.session_state.scada_logger_db = pd.concat([st.session_state.scada_logger_db, new_audit_row], ignore_index=True)
 
+# Hold rolling 50 index values in dynamic memory buffer
 if len(st.session_state.scada_logger_db) > 50:
     st.session_state.scada_logger_db = st.session_state.scada_logger_db.tail(50)
 
@@ -153,7 +153,6 @@ m3.metric("Measured Emissions", f"{current_emissions:.1f} kg CO2")
 st.markdown("---")
 
 if residual_error > LEAK_THRESHOLD_KG:
-    # Scale liabilities to 2-second window penalties
     penalty_usd_2s = ((residual_error / 1000.0) * CARBON_TAX_PER_TON) / INTERVAL_DIVISOR
     penalty_inr_2s = penalty_usd_2s * USD_TO_INR
     st.error(f"🚨 **CRITICAL ALARM: Leakage Detected!** Instant Penalty: **${penalty_usd_2s:.4f} / 2s** (approx. **₹{penalty_inr_2s:.2f} / 2s**)")
