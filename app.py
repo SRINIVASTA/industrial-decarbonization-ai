@@ -72,7 +72,7 @@ optimizer_model.fit(training_df[['throughput_tons', 'power_draw_kw']], training_
 # ====================================================
 if "scada_logger_db" not in st.session_state:
     st.session_state.scada_logger_db = pd.DataFrame(columns=[
-        "Timestamp (IST)", "Live Throughput (T/h)", "Live Power Demand (kW)", 
+        "Live Power Demand (kW)", 
         "Measured Emissions (kg CO2)", "AI Predicted Baseline (kg)", 
         "Emissions Residual Gap (kg)", "Carbon Tax ($/Ton)", 
         "Electricity Rate ($/kWh)", "2s Cycle Savings (USD)", "2s Cycle Savings (INR)"
