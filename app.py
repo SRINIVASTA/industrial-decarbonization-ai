@@ -68,7 +68,7 @@ optimizer_model = LinearRegression()
 optimizer_model.fit(training_df[['throughput_tons', 'power_draw_kw']], training_df['direct_emissions_kg'])
 
 # ====================================================
-# 💾 PERSISTENT ROW-BASED DATA LOGGER STORAGE
+# 💾 PERSISTENT ROW-BASED DATA LOGGER STORAGE (SYNCHRONIZED HEADERS)
 # ====================================================
 if "scada_logger_db" not in st.session_state:
     st.session_state.scada_logger_db = pd.DataFrame(columns=[
@@ -100,7 +100,7 @@ if trigger_leak:
 else:
     current_emissions = float(50 + (current_power * 0.6) + (current_throughput * 2.0) + np.random.uniform(-3, 3))
 
-# Core Machine Learning Array Extracted safely using explicit [0] index locators
+# Core Machine Learning Inferences
 input_features = pd.DataFrame([[current_throughput, current_power]], columns=['throughput_tons', 'power_draw_kw'])
 normal_predicted = float(optimizer_model.predict(input_features)[0])
 residual_error = current_emissions - normal_predicted
@@ -123,7 +123,7 @@ carbon_savings_usd_2s = (carbon_saved_2s_kg / 1000.0) * CARBON_TAX_PER_TON
 savings_usd_2s = energy_savings_usd_2s + carbon_savings_usd_2s
 savings_inr_2s = savings_usd_2s * USD_TO_INR
 
-# --- APPEND RECENT ROW HORIZONTALLY TO MEMORY DATABASE ---
+# --- APPEND RECENT ROW HORIZONTALLY (STRICT KEY MATCHING) ---
 new_audit_row = pd.DataFrame([{
     "Timestamp (IST)": current_ist_time,
     "Live Throughput (T/h)": round(current_throughput, 2),
@@ -139,7 +139,7 @@ new_audit_row = pd.DataFrame([{
 
 st.session_state.scada_logger_db = pd.concat([st.session_state.scada_logger_db, new_audit_row], ignore_index=True)
 
-# Hold rolling 50 index values in dynamic memory buffer
+# Hold rolling 50 entries in memory buffer
 if len(st.session_state.scada_logger_db) > 50:
     st.session_state.scada_logger_db = st.session_state.scada_logger_db.tail(50)
 
