@@ -113,7 +113,7 @@ Historical baseline data streams loaded within this application are compiled fro
 The diagram below illustrates how physical factory hardware measures real-world metrics, bundles them into structured data packets, and streams them securely to your real-time Streamlit analytics platform:
 
 
-
+```text
 ┌──────────────────┐      Analog Volt/Amp Signals      ┌───────────────────────────┐
 │ Factory Machine  ├──────────────────────────────────►│  Physical IoT Hardware   │
 │  (Active Load)   │                                   │ (CT Clamps & Load Cells)  │
@@ -125,3 +125,4 @@ The diagram below illustrates how physical factory hardware measures real-world 
 │  Streamlit App   │◄──────────────────────────────────┤     ESP32 Microchip /     │
 │ (AI UI Engine)   │     JSON Payload Packet Streams   │  Industrial Edge Gateway  │
 └──────────────────┘     Topic: factory/scada/telemetry└───────────────────────────┘
+```
