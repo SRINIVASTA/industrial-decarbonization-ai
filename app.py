@@ -14,7 +14,7 @@ st.set_page_config(page_title="Industrial Decarbonization AI Engine", layout="wi
 st_autorefresh(interval=2000, limit=None, key="scada_telemetry_counter")
 
 st.title("🏭 Industrial Decarbonization AI Platform")
-st.subheader("Interactive Continuous SCADA Telemetry Logging & Cost Audit")
+st.subheader("Interactive Real-Time SCADA Telemetry Logging & Cost Audit")
 
 USD_TO_INR = 83.50  # 1 USD = ₹83.50 INR
 
@@ -68,13 +68,12 @@ optimizer_model.fit(training_df[['throughput_tons', 'power_draw_kw']], training_
 # ====================================================
 # 💾 PERSISTENT ROW-BASED DATA LOGGER STORAGE
 # ====================================================
-# Creates a continuous rolling table that stores fresh rows every 2 seconds
 if "scada_logger_db" not in st.session_state:
     st.session_state.scada_logger_db = pd.DataFrame(columns=[
         "Timestamp (IST)", "Live Throughput (T/h)", "Live Power Demand (kW)", 
         "Measured Emissions (kg CO2)", "AI Predicted Baseline (kg)", 
         "Emissions Residual Gap (kg)", "Carbon Tax ($/Ton)", 
-        "Electricity Rate ($/kWh)", "Hourly Savings (USD)", "Hourly Savings (INR)"
+        "Electricity Rate ($/kWh)", "2s Cycle Savings (USD)", "2s Cycle Savings (INR)"
     ])
 
 # ----------------------------------------------------
@@ -82,14 +81,14 @@ if "scada_logger_db" not in st.session_state:
 # ----------------------------------------------------
 col_btn1, col_btn2 = st.columns(2)
 with col_btn1:
-    st.success("🔄 **System Active:** Appending a fresh data row every 2 seconds.")
+    st.success("🔄 **System Active:** Appending real-time metrics every 2 seconds.")
 with col_btn2:
     trigger_leak = st.toggle("🚨 Force Simulated Hardware Failure / Leak Event", value=False)
 
 ist_timezone = pytz.timezone('Asia/Kolkata')
 current_ist_time = datetime.now(ist_timezone).strftime('%Y-%m-%d %H:%M:%S')
 
-# Generate live metric drift
+# Generate live metrics
 live_drift = (time.time() % 10) - 5  
 current_throughput = float(np.random.uniform(51.0, 55.0) + (live_drift * 0.1))
 current_power = float(np.random.uniform(490.0, 540.0) + live_drift)
@@ -99,21 +98,33 @@ if trigger_leak:
 else:
     current_emissions = float(50 + (current_power * 0.6) + (current_throughput * 2.0) + np.random.uniform(-3, 3))
 
-# Core Machine Learning Inferences
+# ML Baseline Predictions
 input_features = pd.DataFrame([[current_throughput, current_power]], columns=['throughput_tons', 'power_draw_kw'])
-normal_predicted = float(optimizer_model.predict(input_features)[0])
+normal_predicted = float(optimizer_model.predict(input_features))
 residual_error = current_emissions - normal_predicted
 
 reduction_factor = 1.0 - (LOAD_REDUCTION_PCT / 100.0)
 optimized_features = pd.DataFrame([[current_throughput, current_power * reduction_factor]], columns=['throughput_tons', 'power_draw_kw'])
-optimized_predicted = float(optimizer_model.predict(optimized_features)[0])
-carbon_saved_kg = normal_predicted - optimized_predicted
+optimized_predicted = float(optimizer_model.predict(optimized_features))
+carbon_saved_hourly_kg = normal_predicted - optimized_predicted
 
-# Financial Formulations
-financial_savings_usd = ((current_power * (LOAD_REDUCTION_PCT / 100.0)) * ENERGY_COST_PER_KWH) + ((carbon_saved_kg / 1000.0) * CARBON_TAX_PER_TON)
-financial_savings_inr = financial_savings_usd * USD_TO_INR
+# ====================================================
+# 🧮 RECALIBRATED REAL-TIME 2-SECOND MATHEMATICS
+# ====================================================
+# Convert hourly resource metrics to a 2-second interval window (1 hour = 1800 cycles of 2 seconds)
+INTERVAL_DIVISOR = 1800.0
 
-# --- APPEND RECENT ROW HORIZONTALLY TO MEMORY STORAGE ---
+carbon_saved_2s_kg = carbon_saved_hourly_kg / INTERVAL_DIVISOR
+
+# 2s Financial Calculations: (Power Draw drop converted to 2s kWh consumption) + (2s Carbon Tax saved)
+power_saved_kw = current_power * (LOAD_REDUCTION_PCT / 100.0)
+energy_savings_usd_2s = (power_saved_kw / INTERVAL_DIVISOR) * ENERGY_COST_PER_KWH
+carbon_savings_usd_2s = (carbon_saved_2s_kg / 1000.0) * CARBON_TAX_PER_TON
+
+savings_usd_2s = energy_savings_usd_2s + carbon_savings_usd_2s
+savings_inr_2s = savings_usd_2s * USD_TO_INR
+
+# --- APPEND RECENT ROW HORIZONTALLY TO DATABASE ---
 new_audit_row = pd.DataFrame([{
     "Timestamp (IST)": current_ist_time,
     "Live Throughput (T/h)": round(current_throughput, 2),
@@ -123,13 +134,12 @@ new_audit_row = pd.DataFrame([{
     "Emissions Residual Gap (kg)": round(residual_error, 2),
     "Carbon Tax ($/Ton)": CARBON_TAX_PER_TON,
     "Electricity Rate ($/kWh)": ENERGY_COST_PER_KWH,
-    "Hourly Savings (USD)": round(financial_savings_usd, 2),
-    "Hourly Savings (INR)": round(financial_savings_inr, 2)
+    "2s Cycle Savings (USD)": round(savings_usd_2s, 4),  # Rounded to 4 decimals to show fine value shifts
+    "2s Cycle Savings (INR)": round(savings_inr_2s, 2)
 }])
 
 st.session_state.scada_logger_db = pd.concat([st.session_state.scada_logger_db, new_audit_row], ignore_index=True)
 
-# Keep only the latest 50 entries to keep memory usage balanced
 if len(st.session_state.scada_logger_db) > 50:
     st.session_state.scada_logger_db = st.session_state.scada_logger_db.tail(50)
 
@@ -143,17 +153,21 @@ m3.metric("Measured Emissions", f"{current_emissions:.1f} kg CO2")
 st.markdown("---")
 
 if residual_error > LEAK_THRESHOLD_KG:
-    penalty_usd = (residual_error / 1000.0) * CARBON_TAX_PER_TON
-    penalty_inr = penalty_usd * USD_TO_INR
-    st.error(f"🚨 **CRITICAL ALARM: Leakage Detected!** Liability: **${penalty_usd:.2f}/hr** (approx. **₹{penalty_inr:.2f}/hr**)")
+    # Scale liabilities to 2-second window penalties
+    penalty_usd_2s = ((residual_error / 1000.0) * CARBON_TAX_PER_TON) / INTERVAL_DIVISOR
+    penalty_inr_2s = penalty_usd_2s * USD_TO_INR
+    st.error(f"🚨 **CRITICAL ALARM: Leakage Detected!** Instant Penalty: **${penalty_usd_2s:.4f} / 2s** (approx. **₹{penalty_inr_2s:.2f} / 2s**)")
 else:
     st.success("✅ **Operations Stable**: Footprint conforms to physics parameters.")
+
+st.info(f"💡 **AI Load Shifting Recommendation ({LOAD_REDUCTION_PCT}% Power Drop Target):**  \n"
+        f"In this 2-second window, your configuration mitigates **{carbon_saved_2s_kg:.4f} kg CO2**.  \n"
+        f"This yields an instant financial yield of **${savings_usd_2s:.4f} / 2s** (approx. **₹{savings_inr_2s:.2f} / 2s**) through optimization adjustments.")
 
 # ====================================================
 # 📈 FEATURE A: DYNAMIC REAL-TIME LINE CHART
 # ====================================================
 st.markdown("### 📈 Real-Time Rolling Shift Trend Tracking")
-# This chart maps your live session's exact data history directly from the logging database
 chart_df = st.session_state.scada_logger_db.set_index("Timestamp (IST)")[["Live Power Demand (kW)", "Measured Emissions (kg CO2)"]]
 st.line_chart(chart_df)
 
@@ -161,8 +175,6 @@ st.line_chart(chart_df)
 # 💾 FEATURE B: ROW-BASED COMPLIANCE EXPORT LEDGER
 # ====================================================
 st.markdown("### 💾 Regulatory Compliance & ESG Data Export (Horizontal Registry)")
-
-# Display the horizontal logging database directly on the UI screen
 st.dataframe(st.session_state.scada_logger_db, use_container_width=True)
 
 csv_data = st.session_state.scada_logger_db.to_csv(index=False).encode('utf-8')
