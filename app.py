@@ -154,7 +154,7 @@ if len(st.session_state.scada_logger_db) > 50:
 
 # Layout KPI Card Deck Display 
 # m_time, 
-m1, m2, m3 = st.columns(4) 
+m1, m2, m3 = st.columns(3) 
 # m_time.metric("Indian Local Time (IST)", current_ist_time) 
 m1.metric("Live Throughput", f"{current_throughput:.1f} T/h") 
 m2.metric("Live Power Demand", f"{current_power:.1f} kW") 
