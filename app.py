@@ -2,6 +2,9 @@ import streamlit as st
 import pandas as pd
 import numpy as np
 import requests
+import time
+from datetime import datetime
+import pytz
 from sklearn.linear_model import LinearRegression
 # --- IMPORT AUTOREFRESH COMPONENT ---
 from streamlit_autorefresh import st_autorefresh
@@ -68,7 +71,7 @@ st.sidebar.dataframe(recent_global.set_index('year'))
 # STAGE 2: Machine Learning Process Calibration
 # ----------------------------------------------------
 extended_time_index = pd.date_range(start="2026-04-28 00:00", periods=720, freq="h")
-np.random.seed(42)
+np.random.seed(42)  # Keeps core historical training data calibration locked
 historical_throughput = np.random.normal(loc=50, scale=5, size=720)
 historical_power = np.random.normal(loc=500, scale=50, size=720)
 historical_emissions = 50 + (historical_power * 0.6) + (historical_throughput * 2.0) + np.random.normal(loc=0, scale=5, size=720)
@@ -84,22 +87,28 @@ optimizer_model = LinearRegression()
 optimizer_model.fit(training_df[['throughput_tons', 'power_draw_kw']], training_df['direct_emissions_kg'])
 
 # ----------------------------------------------------
-# STAGE 3: Telemetry Stream Dashboard Setup
+# STAGE 3: Telemetry Stream Dashboard Setup (DYNAMIC CHANGING DATA WITH LIVE IST)
 # ----------------------------------------------------
 col_btn1, col_btn2 = st.columns(2)
 with col_btn1:
-    st.caption("🔄 **Autorefresh Active:** Dashboard updates sensors live every 2 seconds.")
+    st.success("🔄 **Autorefresh Live:** SCADA sensors shifting every 2 seconds.")
 with col_btn2:
     trigger_leak = st.toggle("🚨 Force Simulated Hardware Failure / Leak Event", value=False)
 
-# Simulate current streaming values
-current_throughput = float(np.random.normal(loc=53, scale=2))
-current_power = float(np.random.normal(loc=515, scale=25))
+# Fetch current time in Asia/Kolkata timezone
+ist_timezone = pytz.timezone('Asia/Kolkata')
+current_ist_time = datetime.now(ist_timezone).strftime('%d-%m-%Y %H:%M:%S')
+
+# Generates live, continuous telemetry fluctuation to prevent Streamlit cache lock
+live_drift = (time.time() % 10) - 5  
+current_throughput = float(np.random.uniform(51.0, 55.0) + (live_drift * 0.1))
+current_power = float(np.random.uniform(490.0, 540.0) + live_drift)
 
 if trigger_leak:
     current_emissions = 999.0
 else:
-    current_emissions = float(50 + (current_power * 0.6) + (current_throughput * 2.0) + np.random.normal(loc=0, scale=2))
+    # Forces emissions to match the clean regression baseline plus natural noise
+    current_emissions = float(50 + (current_power * 0.6) + (current_throughput * 2.0) + np.random.uniform(-3, 3))
 
 # FIXED FEATURE ALIGNMENT MATRIX (Matches layout shape perfectly)
 input_features = pd.DataFrame([[current_throughput, current_power]], columns=['throughput_tons', 'power_draw_kw'])
@@ -117,8 +126,9 @@ carbon_saved_kg = normal_predicted - optimized_predicted
 financial_savings_usd = ((current_power * (LOAD_REDUCTION_PCT / 100.0)) * ENERGY_COST_PER_KWH) + ((carbon_saved_kg / 1000.0) * CARBON_TAX_PER_TON)
 financial_savings_inr = financial_savings_usd * USD_TO_INR
 
-# Layout Metrics Display
-m1, m2, m3 = st.columns(3)
+# Layout Metrics Display (Adding Live IST Log Card)
+m_time, m1, m2, m3 = st.columns(4)
+m_time.metric("Indian Local Time (IST)", current_ist_time)
 m1.metric("Live Throughput", f"{current_throughput:.1f} T/h")
 m2.metric("Live Power Demand", f"{current_power:.1f} kW")
 m3.metric("Measured Emissions", f"{current_emissions:.1f} kg CO2")
@@ -140,18 +150,19 @@ st.info(f"💡 **AI Load Shifting Recommendation ({LOAD_REDUCTION_PCT}% Power Dr
         f"This yields a combined financial savings of **${financial_savings_usd:.2f} / hr** (approx. **₹{financial_savings_inr:.2f} / hr**) through reduced utility bills and avoided carbon taxes.")
 
 # ====================================================
-# 📈 FEATURE A: INTERACTIVE TIME-SERIES LINE CHART
+# 📈 FEATURE A: INTERACTIVE TIME-SERIES LINE CHART (DYNAMIC)
 # ====================================================
 st.markdown("### 📈 24-Hour Historical Shift Trend Tracking")
 
 chart_time_index = pd.date_range(end=pd.Timestamp.now(), periods=24, freq="h")
-np.random.seed(101)
+np.random.seed(101)  # Keeps historical graph back-lines steady
 chart_throughput = np.random.normal(loc=52, scale=2, size=24)
 chart_power = np.random.normal(loc=510, scale=30, size=24)
 chart_emissions = 50 + (chart_power * 0.6) + (chart_throughput * 2.0) + np.random.normal(loc=0, scale=3, size=24)
 
-if trigger_leak:
-    chart_emissions[-1] = 999.0  
+# Inject current dynamic live metrics into the absolute newest chart slot
+chart_power[-1] = current_power
+chart_emissions[-1] = current_emissions
 
 chart_df = pd.DataFrame({
     "Power Draw (kW)": chart_power,
@@ -161,20 +172,20 @@ chart_df = pd.DataFrame({
 st.line_chart(chart_df)
 
 # ====================================================
-# 💾 FEATURE B: AUTOMATED AUDIT SHEET DATA EXPORT
+# 💾 FEATURE B: AUTOMATED AUDIT SHEET DATA EXPORT (IST TIMESTAMPED)
 # ====================================================
 st.markdown("### 💾 Regulatory Compliance & ESG Data Export")
 
 export_df = pd.DataFrame({
     "Metric/Parameter Name": [
-        "Timestamp", "Live Throughput (T/h)", "Live Power Demand (kW)", 
+        "Timestamp (IST)", "Live Throughput (T/h)", "Live Power Demand (kW)", 
         "Measured Emissions (kg CO2)", "AI Predicted Emissions Baseline (kg)", 
         "Emissions Residual Gap (kg)", "Carbon Tax Setting ($/Ton)", 
         "Electricity Rate Setting ($/kWh)", "Hourly Dynamic Financial Savings (USD)", 
         "Hourly Dynamic Financial Savings (INR)"
     ],
     "Recorded System Value": [
-        pd.Timestamp.now().strftime('%Y-%m-%d %H:%M:%S'), f"{current_throughput:.2f}", f"{current_power:.2f}",
+        current_ist_time, f"{current_throughput:.2f}", f"{current_power:.2f}",
         f"{current_emissions:.2f}", f"{normal_predicted:.2f}", f"{residual_error:.2f}", 
         f"{CARBON_TAX_PER_TON:.2f}", f"{ENERGY_COST_PER_KWH:.2f}", f"{financial_savings_usd:.2f}", 
         f"{financial_savings_inr:.2f}"
